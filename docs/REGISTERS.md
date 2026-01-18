@@ -11,18 +11,19 @@ Based on: **Huawei SUN2000 Solar Inverter Modbus Interface Definitions**
 | 30070 | U16 | RO | Model ID | - | 1 | - |
 | 32000 | U16 | RO | Status Code | - | 1 | /StatusCode |
 | 32008 | U16 | RO | Error Code | - | 1 | /ErrorCode |
-| 32016 | U16 | RO | DC Voltage | V | 10 | /Dc/0/Voltage |
-| 32017 | S16 | RO | DC Current | A | 100 | /Dc/0/Current |
-| 32064 | S32 | RO | DC Power / L1 Power | W | 1 | /Dc/0/Power, /Ac/L1/Power |
-| 32066 | S32 | RO | L2 Power | W | 1 | /Ac/L2/Power |
-| 32068 | S32 | RO | L3 Power | W | 1 | /Ac/L3/Power |
-| 32069 | U16 | RO | L1 Voltage | V | 10 | /Ac/L1/Voltage |
-| 32070 | U16 | RO | L2 Voltage | V | 10 | /Ac/L2/Voltage |
-| 32071 | U16 | RO | L3 Voltage | V | 10 | /Ac/L3/Voltage |
-| 32072 | S32 | RO | L1 Current | A | 1000 | /Ac/L1/Current |
-| 32074 | S32 | RO | L2 Current | A | 1000 | /Ac/L2/Current |
-| 32076 | S32 | RO | L3 Current | A | 1000 | /Ac/L3/Current |
-| 32080 | S32 | RO | Total AC Power | W | 1 | /Ac/Power |
+| 32016 | U16 | RO | PV1 Voltage | V | 10 | /Dc/0/Voltage |
+| 32017 | S16 | RO | PV1 Current | A | 100 | /Dc/0/Current |
+| 32064 | I32 | RO | Input Power (DC from PV) | W | 1 | /Dc/0/Power |
+| 32066 | U16 | RO | Line voltage A-B | V | 10 | - |
+| 32067 | U16 | RO | Line voltage B-C | V | 10 | - |
+| 32068 | U16 | RO | Line voltage C-A | V | 10 | - |
+| 32069 | U16 | RO | Phase A Voltage | V | 10 | /Ac/L1/Voltage |
+| 32070 | U16 | RO | Phase B Voltage | V | 10 | /Ac/L2/Voltage |
+| 32071 | U16 | RO | Phase C Voltage | V | 10 | /Ac/L3/Voltage |
+| 32072 | I32 | RO | Phase A Current | A | 1000 | /Ac/L1/Current |
+| 32074 | I32 | RO | Phase B Current | A | 1000 | /Ac/L2/Current |
+| 32076 | I32 | RO | Phase C Current | A | 1000 | /Ac/L3/Current |
+| 32080 | I32 | RO | Total Active Power | W | 1 (total), 3 (per phase) | /Ac/Power, /Ac/L1-3/Power |
 | 32085 | U16 | RO | Grid Frequency | Hz | 100 | /Ac/Frequency |
 | 32106 | U32 | RO | Accumulated Energy Yield | kWh | 100 | /Yield/Power |
 | 32114 | U32 | RO | Daily Energy Yield | kWh | 100 | /Ac/Energy/Forward |
@@ -60,6 +61,23 @@ Values must be divided by the gain factor to get actual values:
 | 10 | 0.1 | 2300 | 230.0 V |
 | 100 | 0.01 | 2157 | 21.57 A |
 | 1000 | 0.001 | 8750 | 8.750 A |
+
+### Important Register Notes
+
+**Register 32080 (Total Active Power)**:
+- Hardware stores value with implied gain of 1000 (unit: kW)
+- Example: Raw value `2500` = 2.5 kW in hardware
+- Plugin reads with gain=1 to get Watt: `2500 / 1 = 2500 W` ✓
+- For phase power (L1/L2/L3), same register read with gain=3: `2500 / 3 = 833 W per phase` ✓
+
+**Register 32064 (Input Power)**:
+- This is **DC Input Power from PV panels**, NOT AC phase power!
+- Stored with implied gain of 1000 (unit: kW)
+- Plugin reads with gain=1 to get Watt
+
+**Registers 32066-32068**:
+- These are **line voltages** (voltage between phases), NOT phase powers!
+- Only valid for 3-phase installations with L/N/L1/L2/L3 configuration
 
 ## Status Codes
 
@@ -145,18 +163,23 @@ For efficient polling, read registers in groups:
 - 32000-32001: Status Code, Error Code
 
 **Group 2: DC Input (4 registers)**
-- 32016-32019: DC Voltage, DC Current, DC Power (2 regs)
+- 32016-32017: PV1 Voltage, PV1 Current
+- 32064-32065: Input Power (DC, 2 regs for I32)
 
-**Group 3: AC Output (10 registers)**
-- 32064-32073: Phase Powers (L1, L2, L3) + Voltages
+**Group 3: AC Output Voltages (7 registers)**
+- 32066-32068: Line voltages (A-B, B-C, C-A)
+- 32069-32071: Phase voltages (L1, L2, L3)
 
 **Group 4: AC Currents (6 registers)**
-- 32072-32077: Phase Currents (L1, L2, L3)
+- 32072-32073: Phase A Current (2 regs for I32)
+- 32074-32075: Phase B Current (2 regs for I32)
+- 32076-32077: Phase C Current (2 regs for I32)
 
-**Group 5: Energy (6 registers)**
-- 32080-32085: Total Power, Frequency
-- 32106-32107: Accumulated Energy
-- 32114-32115: Daily Energy
+**Group 5: AC Power & Energy (8 registers)**
+- 32080-32081: Total Active Power (2 regs for I32)
+- 32085: Grid Frequency
+- 32106-32107: Accumulated Energy (2 regs for U32)
+- 32114-32115: Daily Energy (2 regs for U32)
 
 ## Timing Considerations
 

@@ -2,12 +2,100 @@
 
 Complete step-by-step installation guide for Helios-Victron.
 
+## Installation Methods
+
+This guide covers two installation methods:
+1. **Automated Installation** (Recommended) - Uses `install.sh` script
+2. **Manual Installation** - Step-by-step manual setup
+
+Choose the method that best suits your needs.
+
 ## Prerequisites
 
 - Victron GX device (Cerbo GX, Venus GX, etc.) with Venus OS v2.90 or higher
 - Huawei SUN2000 inverter with RS485/Modbus RTU support
 - RS485 to USB adapter
 - SSH access to your GX device
+
+---
+
+## Method 1: Automated Installation (Recommended)
+
+The automated installation script handles everything for you.
+
+### Step 1: Access Cerbo GX via SSH
+
+```bash
+ssh root@<cerbo-ip-address>
+# Enter the password you set in Cerbo GX settings
+```
+
+### Step 2: Download Repository
+
+```bash
+# Download the latest release
+cd /tmp
+wget https://github.com/FoxTech-e-U/helios-victron/archive/refs/heads/main.zip
+unzip main.zip
+cd helios-victron-main
+```
+
+### Step 3: Run Installation Script
+
+```bash
+# Make script executable
+chmod +x install.sh
+
+# Run the installer
+./install.sh
+
+# OR specify your USB device if you already know it:
+./install.sh ttyUSB1
+```
+
+### What the Script Does
+
+The `install.sh` script will automatically:
+
+1. ✅ Help identify your USB device (if not specified)
+2. ✅ Backup existing installation (if present)
+3. ✅ Copy `huawei.py` to correct location
+4. ✅ Configure Modbus settings
+5. ✅ Clear Python cache
+6. ✅ Restart necessary services
+7. ✅ Wait for device detection
+8. ✅ Verify installation and show current values
+
+### Example Output
+
+```
+=========================================
+☀️  Helios-Victron Installation
+=========================================
+
+Step 1: Identify USB Device
+[Lists available USB devices and helps you choose]
+
+Step 2: Backup & Install
+✓ File installed
+
+Step 3: Configure Modbus Settings
+✓ Device configuration: rtu:ttyUSB1:9600:1
+✓ Auto-scan enabled
+
+...
+
+✅ Installation Complete!
+Device found: com.victronenergy.pvinverter.huawei_sun2000
+```
+
+**That's it!** Skip to [Part 4: Verification](#part-4-verification) to confirm everything works.
+
+---
+
+## Method 2: Manual Installation
+
+If you prefer manual control or need to troubleshoot, follow these detailed steps.
 
 ## Part 1: Hardware Setup
 

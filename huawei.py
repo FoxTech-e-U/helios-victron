@@ -20,35 +20,40 @@ Status:
   32000: Status Code (U16)
   32008: Error Code (U16)
 
-AC Output:
-  32080: Total AC Power (S32, 1W resolution)
+AC Output - Total:
+  32080: Total AC Power (I32, unit=kW, gain=1 -> displayed as W)
   32085: Grid Frequency (U16, 0.01Hz resolution)
   32114: Daily Energy Yield (U32, 0.01kWh resolution)
   32106: Accumulated Energy Yield (U32, 0.01kWh resolution)
 
-AC Phases (L1=32069-32072, L2=32070-32074, L3=32071-32076):
+AC Output - Phases (L1/L2/L3):
   32069/70/71: Phase Voltage (U16, 0.1V resolution)
-  32072/74/76: Phase Current (S32, 0.001A resolution)
-  32064/66/68: Phase Power (S32, 1W resolution)
+  32072/74/76: Phase Current (I32, 0.001A resolution)
+  32080: Phase Power (I32, gain=3 -> Total/3 in W, same register read 3x)
 
 DC Input:
-  32064: DC Power (S32, 1W resolution)
-  32016: DC Voltage (U16, 0.1V resolution)
-  32017: DC Current (S16, 0.01A resolution)
+  32064: Input Power from PV (I32, unit=kW, gain=1 -> displayed as W)
+  32016: PV1 Voltage (U16, 0.1V resolution)
+  32017: PV1 Current (I16, 0.01A resolution)
 
 D-Bus Paths:
 -----------
-/Ac/Power                - Total AC output power (W)
+/Ac/Power                - Total AC output power (W, from register 32080)
 /Ac/Energy/Forward       - Daily energy production (kWh)
 /Yield/Power             - Lifetime total energy (kWh)
 /Ac/Frequency            - Grid frequency (Hz)
 /Ac/L1/Voltage           - L1 voltage (V)
 /Ac/L1/Current           - L1 current (A)
-/Ac/L1/Power             - L1 power (W)
-(... L2 and L3 similar)
-/Dc/0/Voltage            - DC input voltage (V)
-/Dc/0/Current            - DC input current (A)
-/Dc/0/Power              - DC input power (W)
+/Ac/L1/Power             - L1 power (W) - register 32080 with gain=3
+/Ac/L2/Voltage           - L2 voltage (V)
+/Ac/L2/Current           - L2 current (A)
+/Ac/L2/Power             - L2 power (W) - register 32080 with gain=3
+/Ac/L3/Voltage           - L3 voltage (V)
+/Ac/L3/Current           - L3 current (A)
+/Ac/L3/Power             - L3 power (W) - register 32080 with gain=3
+/Dc/0/Voltage            - PV input voltage (V)
+/Dc/0/Current            - PV input current (A)
+/Dc/0/Power              - PV input power (W, from register 32064)
 /Position                - Inverter position (1 = AC Output)
 /StatusCode              - Inverter status
 /ErrorCode               - Error/fault code
@@ -80,46 +85,46 @@ class Huawei_PV_Inverter(device.EnergyMeter):
     
     def __init__(self, *args):
         super().__init__(*args)
-        
+
         # No info registers needed (Serial, FirmwareVersion, etc.)
         # These would require Reg_text which can cause null byte issues
         self.info_regs = []
-        
+
         # Data registers - polled continuously
         self.data_regs = [
             # Status Registers
             Reg_u16(32000, '/StatusCode'),
             Reg_u16(32008, '/ErrorCode'),
-            
-            # AC Output - Total
-            Reg_s32b(32080, '/Ac/Power', 1, '%.0f W'),
+
+            # AC Output - Total Power
+            Reg_s32b(32080, '/Ac/Power', 1, '%.0f W'),  # Total active power in Watt
             Reg_u32b(32114, '/Ac/Energy/Forward', 100, '%.2f kWh'),  # Daily yield
             Reg_u32b(32106, '/Yield/Power', 100, '%.2f kWh'),        # Lifetime total
-            
+
             # AC Output - Frequency (same for all phases)
             Reg_u16(32085, '/Ac/Frequency', 100, '%.2f Hz'),
-            
+
             # AC Output - Phase 1
             Reg_u16(32069, '/Ac/L1/Voltage', 10, '%.1f V'),
             Reg_s32b(32072, '/Ac/L1/Current', 1000, '%.3f A'),
-            Reg_s32b(32064, '/Ac/L1/Power', 1, '%.0f W'),
-            
+            Reg_s32b(32080, '/Ac/L1/Power', 3, '%.0f W'),  # Total/3 via gain=3
+
             # AC Output - Phase 2
             Reg_u16(32070, '/Ac/L2/Voltage', 10, '%.1f V'),
             Reg_s32b(32074, '/Ac/L2/Current', 1000, '%.3f A'),
-            Reg_s32b(32066, '/Ac/L2/Power', 1, '%.0f W'),
-            
+            Reg_s32b(32080, '/Ac/L2/Power', 3, '%.0f W'),  # Total/3 via gain=3
+
             # AC Output - Phase 3
             Reg_u16(32071, '/Ac/L3/Voltage', 10, '%.1f V'),
             Reg_s32b(32076, '/Ac/L3/Current', 1000, '%.3f A'),
-            Reg_s32b(32068, '/Ac/L3/Power', 1, '%.0f W'),
-            
-            # DC Input (from solar panels)
-            Reg_s32b(32064, '/Dc/0/Power', 1, '%.0f W'),
+            Reg_s32b(32080, '/Ac/L3/Power', 3, '%.0f W'),  # Total/3 via gain=3
+
+            # DC Input (from solar panels) - Register 32064 is INPUT POWER
+            Reg_s32b(32064, '/Dc/0/Power', 1, '%.0f W'),  # Input power in Watt
             Reg_u16(32016, '/Dc/0/Voltage', 10, '%.1f V'),
             Reg_s16(32017, '/Dc/0/Current', 100, '%.2f A'),
         ]
-    
+
     def get_ident(self):
         """Return unique identifier for this device."""
         return 'huawei_sun2000'

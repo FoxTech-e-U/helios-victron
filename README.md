@@ -80,14 +80,51 @@ Huawei SUN2000 (COM Port)          RS485-USB Adapter
 
 ## 🚀 Installation
 
-### Step 1: Access Cerbo GX via SSH
+### Quick Installation (Recommended)
+
+We provide an automated installation script that handles everything for you:
 
 ```bash
-# Enable SSH access in Cerbo GX settings first and set ssh password
+# 1. Download the repository
+wget https://github.com/FoxTech-e-U/helios-victron/archive/refs/heads/main.zip
+unzip main.zip
+cd helios-victron-main
+
+# 2. Run the installation script
+chmod +x install.sh
+./install.sh
+
+# The script will:
+# - Help you identify the correct USB device
+# - Install the huawei.py plugin
+# - Configure Modbus settings automatically
+# - Restart services and verify the installation
+```
+
+The installation script is interactive and will guide you through each step!
+
+### Manual Installation
+
+If you prefer manual installation or need more control, follow these steps:
+
+#### Step 1: Access Cerbo GX via SSH
+
+```bash
+# Enable SSH access in Cerbo GX settings first and set root password
 ssh root@<cerbo-ip-address>
 ```
 
-### Step 2: Identify USB Device
+#### Step 2: Download Files
+
+```bash
+# Download the repository
+cd /tmp
+wget https://github.com/FoxTech-e-U/helios-victron/archive/refs/heads/main.zip
+unzip main.zip
+cd helios-victron-main
+```
+
+#### Step 3: Identify USB Device
 
 ```bash
 # List USB serial devices
@@ -100,32 +137,23 @@ ls -l /dev/ttyUSB*
 
 ⚠️ **Important**: Note which `ttyUSBX` is your Huawei inverter!
 
-### Step 3: Install the Plugin
+#### Step 4: Install the Plugin
 
 ```bash
-# Download the huawei.py file
-cd /opt/victronenergy/dbus-modbus-client/
-wget https://raw.githubusercontent.com/FoxTech-e-U/helios-victron/main/huawei.py
-
-# OR manually create the file (see huawei.py in this repo)
-
-# Set correct permissions
-chmod 644 huawei.py
+# Copy huawei.py to modbus-client directory
+cp huawei.py /opt/victronenergy/dbus-modbus-client/
+chmod 644 /opt/victronenergy/dbus-modbus-client/huawei.py
 ```
 
-### Step 4: Configure Modbus Settings
+#### Step 5: Configure Modbus Settings
 
 ```bash
-# Set the device path and baud rate for your ttyUSBX
+# Replace ttyUSB1 with your actual device!
 dbus -y com.victronenergy.settings /Settings/ModbusClient/ttyUSB1/Devices SetValue "rtu:ttyUSB1:9600:1"
-
-# Enable auto-scan
 dbus -y com.victronenergy.settings /Settings/ModbusClient/ttyUSB1/AutoScan SetValue 1
 ```
 
-**Replace `ttyUSB1` with your actual device!**
-
-### Step 5: Restart Services
+#### Step 6: Restart Services
 
 ```bash
 # Clear Python cache
@@ -146,7 +174,7 @@ You should see:
 com.victronenergy.pvinverter.huawei_sun2000
 ```
 
-### Step 6: Verify Installation
+#### Step 7: Verify Installation
 
 ```bash
 # Check all values
@@ -155,6 +183,10 @@ dbus -y com.victronenergy.pvinverter.huawei_sun2000 / GetValue
 # Check if system sees PV inverter
 dbus -y com.victronenergy.system /Ac/PvOnOutput/L1/Power GetValue
 ```
+
+### Detailed Installation Guide
+
+For a complete step-by-step guide with troubleshooting, see [docs/INSTALLATION.md](docs/INSTALLATION.md)
 
 ## 📊 Available Data Points
 
