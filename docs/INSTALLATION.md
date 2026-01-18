@@ -173,7 +173,7 @@ For this guide, we'll assume **ttyUSB1** is the Huawei inverter.
 cd /opt/victronenergy/dbus-modbus-client/
 
 # Download the plugin
-wget https://raw.githubusercontent.com/yggdrasilodin/helios-victron/main/huawei.py
+wget https://raw.githubusercontent.com/FoxTech-e-U/helios-victron/main/huawei.py
 
 # OR manually create it:
 # Copy the contents from huawei.py in this repo
@@ -346,7 +346,7 @@ tail -f /var/log/dbus-modbus-client.ttyUSB1/current | tai64nlocal
 
 ## Support
 
-- Report issues: [GitHub Issues](https://github.com/YOUR-USERNAME/helios-victron/issues)
-- Ask questions: [GitHub Discussions](https://github.com/YOUR-USERNAME/helios-victron/discussions)
+- Report issues: [GitHub Issues](https://github.com/FoxTech-e-U/helios-victron/issues)
+- Ask questions: [GitHub Discussions](https://github.com/FoxTech-e-U/helios-victron/discussions)
 - Buy Me a Coffee: [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/olli_foxtech)
 
