@@ -10,8 +10,8 @@ Protocol: Modbus RTU
 Baud Rate: 9600
 Device Address: 1 (default)
 
-Author: Oliver (SecAdvise)
-Repository: https://github.com/YOUR-USERNAME/helios-victron
+Author: Olli from FoxTech e.U.
+Repository: https://github.com/FoxTech-e-U/helios-victron
 License: MIT
 
 Modbus Register Mapping:
