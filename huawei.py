@@ -151,5 +151,5 @@ probe.add_handler(probe.ModelRegister(
     models,
     methods=['rtu'],  # Modbus RTU only (not TCP)
     rates=[9600],     # Baud rate
-    units=[1, 2, 3]   # Modbus device addresses to try
+    units=[1]   # Modbus device addresses to try
 ))
