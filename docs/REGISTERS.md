@@ -2,250 +2,217 @@
 
 Complete Modbus register mapping for Huawei SUN2000 inverters.
 
-Based on: **Huawei SUN2000 Solar Inverter Modbus Interface Definitions**
+Based on: **SUN2000MA Modbus Interface Definitions, Issue 09 (2025-12-19)**
 
 ## Register Overview
 
 | Address | Type | R/W | Description | Unit | Gain | D-Bus Path |
 |---------|------|-----|-------------|------|------|------------|
+| 30000 | STR | RO | Model name | - | - | - |
 | 30070 | U16 | RO | Model ID | - | 1 | - |
-| 32000 | U16 | RO | Status Code | - | 1 | /StatusCode |
-| 32008 | U16 | RO | Error Code | - | 1 | /ErrorCode |
-| 32016 | U16 | RO | PV1 Voltage | V | 10 | /Dc/0/Voltage |
-| 32017 | S16 | RO | PV1 Current | A | 100 | /Dc/0/Current |
-| 32064 | I32 | RO | Input Power (DC from PV) | W | 1 | /Dc/0/Power |
-| 32066 | U16 | RO | Line voltage A-B | V | 10 | - |
-| 32067 | U16 | RO | Line voltage B-C | V | 10 | - |
-| 32068 | U16 | RO | Line voltage C-A | V | 10 | - |
-| 32069 | U16 | RO | Phase A Voltage | V | 10 | /Ac/L1/Voltage |
-| 32070 | U16 | RO | Phase B Voltage | V | 10 | /Ac/L2/Voltage |
-| 32071 | U16 | RO | Phase C Voltage | V | 10 | /Ac/L3/Voltage |
-| 32072 | I32 | RO | Phase A Current | A | 1000 | /Ac/L1/Current |
-| 32074 | I32 | RO | Phase B Current | A | 1000 | /Ac/L2/Current |
-| 32076 | I32 | RO | Phase C Current | A | 1000 | /Ac/L3/Current |
-| 32080 | I32 | RO | Total Active Power | W | 1 (total), 3 (per phase) | /Ac/Power, /Ac/L1-3/Power |
-| 32085 | U16 | RO | Grid Frequency | Hz | 100 | /Ac/Frequency |
-| 32106 | U32 | RO | Accumulated Energy Yield | kWh | 100 | /Yield/Power |
-| 32114 | U32 | RO | Daily Energy Yield | kWh | 100 | /Ac/Energy/Forward |
+| 32000 | Bitfield16 | RO | Remote comm status | - | - | - |
+| 32008 | Bitfield16 | RO | Alarm 1 | - | - | - |
+| 32009 | Bitfield16 | RO | Alarm 2 | - | - | - |
+| 32010 | Bitfield16 | RO | Alarm 3 | - | - | - |
+| 32016 | I16 | RO | PV1 Voltage | V | 10 | /Dc/0/Voltage |
+| 32017 | I16 | RO | PV1 Current | A | 100 | /Dc/0/Current |
+| 32064 | I32 | RO | Input Power (DC from PV) | kW | 1000→W | /Dc/0/Power |
+| 32066 | U16 | RO | Line voltage A-B | V | 10 | /Ac/L1L2/Voltage |
+| 32067 | U16 | RO | Line voltage B-C | V | 10 | /Ac/L2L3/Voltage |
+| 32068 | U16 | RO | Line voltage C-A | V | 10 | /Ac/L1L3/Voltage |
+| 32069 | U16 | RO | Phase A voltage | V | 10 | /Ac/L1/Voltage |
+| 32070 | U16 | RO | Phase B voltage | V | 10 | /Ac/L2/Voltage |
+| 32071 | U16 | RO | Phase C voltage | V | 10 | /Ac/L3/Voltage |
+| 32072 | I32 | RO | Phase A current | A | 1000 | /Ac/L1/Current |
+| 32074 | I32 | RO | Phase B current | A | 1000 | /Ac/L2/Current |
+| 32076 | I32 | RO | Phase C current | A | 1000 | /Ac/L3/Current |
+| 32078 | I32 | RO | Peak active power today | kW | 1000→W | - |
+| 32080 | I32 | RO | Total active power | kW | 1000→W | /Ac/Power |
+| 32082 | I32 | RO | Reactive power | kVar | 1000 | - |
+| 32084 | I16 | RO | Power factor | - | 1000 | - |
+| 32085 | U16 | RO | Grid frequency | Hz | 100 | /Ac/Frequency |
+| 32086 | U16 | RO | Efficiency | % | 100 | /Efficiency |
+| 32087 | I16 | RO | Internal temperature | °C | 10 | /Temperature |
+| 32088 | U16 | RO | Insulation resistance | MΩ | 1000 | - |
+| 32089 | ENUM16 | RO | Device status | - | - | /StatusCode |
+| 32090 | U16 | RO | Fault code | - | - | /ErrorCode |
+| 32091 | EPOCHTIME | RO | Startup time | s | - | - |
+| 32093 | EPOCHTIME | RO | Shutdown time | s | - | - |
+| 32106 | U32 | RO | Accumulated energy yield | kWh | 100 | /Yield/Power |
+| 32114 | U32 | RO | Daily energy yield | kWh | 100 | /Ac/Energy/Forward |
 
 ## Data Types
 
-- **U16**: Unsigned 16-bit integer (0 to 65535)
-- **S16**: Signed 16-bit integer (-32768 to 32767)
-- **U32**: Unsigned 32-bit integer (0 to 4294967295)
-- **S32**: Signed 32-bit integer (-2147483648 to 2147483647)
+- **U16**: Unsigned 16-bit integer (1 register)
+- **I16 / S16**: Signed 16-bit integer (1 register)
+- **U32**: Unsigned 32-bit integer (2 registers, big-endian)
+- **I32 / S32**: Signed 32-bit integer (2 registers, big-endian)
+- **Bitfield16**: 16-bit bitmask – individual bits have meaning
+- **ENUM16**: 16-bit enumeration – value maps to a named state
+- **STR**: ASCII string (N registers = 2N bytes)
+- **EPOCHTIME**: Unix timestamp in seconds (2 registers = U32)
 
 ## Byte Order
 
-All multi-byte values use **Big Endian** (most significant byte first).
+All multi-register values use **Big Endian** (most significant word first).
 
-For 32-bit registers:
-- **S32b** / **U32b** = Big Endian, High word first
-- Register N = High 16 bits
-- Register N+1 = Low 16 bits
-
-Example for register 32080 (Total AC Power):
 ```
-Register 32080: 0x0000  (High word)
-Register 32081: 0x1F40  (Low word)
-Combined: 0x00001F40 = 8000W
+Register N:   High 16 bits
+Register N+1: Low 16 bits
+
+Example: Register 32080 = 0x0000, Register 32081 = 0x07D0
+Combined: 0x000007D0 = 2000 → 2000W
 ```
 
-## Gain/Scaling
+## Scale / Gain
 
-Values must be divided by the gain factor to get actual values:
+Victron's `register.py` uses `scale` as a **divisor**: `value = raw / scale`
 
-| Gain | Precision | Example Raw | Example Actual |
-|------|-----------|-------------|----------------|
-| 1 | 1 | 8000 | 8000 W |
-| 10 | 0.1 | 2300 | 230.0 V |
-| 100 | 0.01 | 2157 | 21.57 A |
-| 1000 | 0.001 | 8750 | 8.750 A |
+Huawei documentation uses `gain` as a **multiplier**: `value = raw / gain`
 
-### Important Register Notes
+These are equivalent. Examples:
 
-**Register 32080 (Total Active Power)**:
-- Hardware stores value with implied gain of 1000 (unit: kW)
-- Example: Raw value `2500` = 2.5 kW in hardware
-- Plugin reads with gain=1 to get Watt: `2500 / 1 = 2500 W` ✓
-- For phase power (L1/L2/L3), same register read with gain=3: `2500 / 3 = 833 W per phase` ✓
+| Gain (Huawei) | Scale (Victron) | Raw | Actual |
+|---------------|-----------------|-----|--------|
+| 1 | 1 | 2000 | 2000 W |
+| 10 | 10 | 2300 | 230.0 V |
+| 100 | 100 | 5000 | 50.00 Hz |
+| 1000 | 1000 | 15370 | 15.370 A |
 
-**Register 32064 (Input Power)**:
-- This is **DC Input Power from PV panels**, NOT AC phase power!
-- Stored with implied gain of 1000 (unit: kW)
-- Plugin reads with gain=1 to get Watt
+### Power Register Note (32080, 32064)
 
-**Registers 32066-32068**:
-- These are **line voltages** (voltage between phases), NOT phase powers!
-- Only valid for 3-phase installations with L/N/L1/L2/L3 configuration
+Huawei stores power in **kW with gain=1000** (raw/1000 = kW).
+Since we want **Watts**: raw/1000 × 1000 = raw → scale=1
 
-## Status Codes
-
-| Code | Hex | Status | Description |
-|------|-----|--------|-------------|
-| 0 | 0x0000 | Standby | Waiting (no irradiation) |
-| 1 | 0x0001 | Grid-connected | Normal operation |
-| 2 | 0x0002 | Grid-connected (derating) | Power limitation active |
-| 3 | 0x0003 | Shutdown | Normal shutdown |
-| 4 | 0x0004 | Fault | Fault condition |
-| 5 | 0x0005 | Off-grid charging | Battery charging mode |
-
-Common status codes during operation:
-- **Morning startup**: 0 → 1
-- **Normal day**: 1
-- **Clouds**: 1 or 2
-- **Evening shutdown**: 1 → 3 → 0
-- **Night**: 0
-
-## Error Codes
-
-Error codes are specific to your inverter model. Refer to Huawei documentation for meanings.
-
-Common error codes:
-- **0**: No error
-- **1xxx**: Grid faults
-- **2xxx**: DC input faults
-- **3xxx**: AC output faults
-- **4xxx**: Temperature faults
-- **5xxx**: Communication faults
-
-## Register Read Examples
-
-### Python (pymodbus)
-
-```python
-from pymodbus.client import ModbusSerialClient
-
-client = ModbusSerialClient(
-    port='/dev/ttyUSB1',
-    baudrate=9600,
-    parity='N',
-    stopbits=1,
-    bytesize=8,
-    timeout=1
-)
-
-if client.connect():
-    # Read status code (U16)
-    result = client.read_holding_registers(32000, 1, slave=1)
-    status = result.registers[0]
-    print(f"Status: {status}")
-    
-    # Read total power (S32)
-    result = client.read_holding_registers(32080, 2, slave=1)
-    power_raw = (result.registers[0] << 16) | result.registers[1]
-    power = power_raw / 1  # Gain = 1
-    print(f"Power: {power}W")
-    
-    # Read L1 voltage (U16)
-    result = client.read_holding_registers(32069, 1, slave=1)
-    voltage = result.registers[0] / 10  # Gain = 10
-    print(f"L1 Voltage: {voltage}V")
-    
-    client.close()
+```
+Raw value: 2000
+Huawei doc: 2000 / 1000 = 2.0 kW
+In Watts:  2000 / 1    = 2000 W  ← scale=1 in plugin
 ```
 
-### Bash (modbus CLI)
+## Device Status Codes (Register 32089)
 
-```bash
-# Read status code (register 32000, 1 register, slave 1)
-modbus read -s 1 -a 32000 -c 1 -t 4 -b 9600 -d 8 -p none /dev/ttyUSB1
+| Value | Hex | Description |
+|-------|-----|-------------|
+| 0 | 0x0000 | Standby: initialization |
+| 1 | 0x0001 | Standby: insulation resistance detection |
+| 2 | 0x0002 | Standby: sunlight detection |
+| 3 | 0x0003 | Standby: grid detecting |
+| 256 | 0x0100 | Starting |
+| 512 | 0x0200 | On-grid (running normally) |
+| 513 | 0x0201 | Grid connected: power limited |
+| 514 | 0x0202 | Grid connected: self derating |
+| 515 | 0x0203 | Off-grid operation |
+| 768 | 0x0300 | OFF: unexpected shutdown |
+| 769 | 0x0301 | OFF: instructed shutdown |
+| 770 | 0x0302 | OFF: OVGR |
+| 771 | 0x0303 | OFF: communication interrupted |
+| 772 | 0x0304 | OFF: power limited |
+| 773 | 0x0305 | OFF: manual startup required |
+| 775 | 0x0307 | Shutdown: rapid shutdown |
+| 40960 | 0xA000 | Standby: no irradiation (night) |
 
-# Read total power (register 32080, 2 registers for S32)
-modbus read -s 1 -a 32080 -c 2 -t 4 -b 9600 -d 8 -p none /dev/ttyUSB1
+## Remote Communication Status (Register 32000, Bitfield16)
+
+| Bit | Description |
+|-----|-------------|
+| 0 | Standby |
+| 1 | Grid-connected |
+| 2 | Grid-connected normally |
+| 3 | Grid connection with derating (power rationing) |
+| 4 | Grid connection with derating (internal causes) |
+| 5 | Normal stop |
+| 6 | Stop due to faults |
+| 7 | Stop due to power rationing |
+| 8 | Shutdown |
+| 9 | Spot check |
+| 10 | Off-grid operation |
+| 11 | Hot Standby Operation |
+
+⚠️ **Note**: Register 32000 is a Bitfield, NOT a simple status code.
+Use register **32089** (Device Status ENUM16) for the actual operational state.
+
+## Efficient Register Groups
+
+Read registers in blocks to minimize bus traffic:
+
+**Group 1 – Status (3 registers)**
+```
+32089: Device status (ENUM16)
+32090: Fault code (U16)
 ```
 
-## Register Groups for Optimization
+**Group 2 – DC Input (4 registers)**
+```
+32016: PV1 voltage (I16)
+32017: PV1 current (I16)
+32064-32065: Input power (I32)
+```
 
-For efficient polling, read registers in groups:
+**Group 3 – AC Voltages (9 registers)**
+```
+32066: Line voltage A-B (U16)
+32067: Line voltage B-C (U16)
+32068: Line voltage C-A (U16)
+32069: Phase A voltage (U16)
+32070: Phase B voltage (U16)
+32071: Phase C voltage (U16)
+```
 
-**Group 1: Status (2 registers)**
-- 32000-32001: Status Code, Error Code
+**Group 4 – AC Currents (6 registers)**
+```
+32072-32073: Phase A current (I32)
+32074-32075: Phase B current (I32)
+32076-32077: Phase C current (I32)
+```
 
-**Group 2: DC Input (4 registers)**
-- 32016-32017: PV1 Voltage, PV1 Current
-- 32064-32065: Input Power (DC, 2 regs for I32)
+**Group 5 – AC Power & Energy (12 registers)**
+```
+32080-32081: Total active power (I32)
+32085: Grid frequency (U16)
+32086: Efficiency (U16)
+32087: Internal temperature (I16)
+32106-32107: Accumulated energy yield (U32)
+32114-32115: Daily energy yield (U32)
+```
 
-**Group 3: AC Output Voltages (7 registers)**
-- 32066-32068: Line voltages (A-B, B-C, C-A)
-- 32069-32071: Phase voltages (L1, L2, L3)
-
-**Group 4: AC Currents (6 registers)**
-- 32072-32073: Phase A Current (2 regs for I32)
-- 32074-32075: Phase B Current (2 regs for I32)
-- 32076-32077: Phase C Current (2 regs for I32)
-
-**Group 5: AC Power & Energy (8 registers)**
-- 32080-32081: Total Active Power (2 regs for I32)
-- 32085: Grid Frequency
-- 32106-32107: Accumulated Energy (2 regs for U32)
-- 32114-32115: Daily Energy (2 regs for U32)
-
-## Timing Considerations
-
-- **Minimum request interval**: 500ms (min_timeout = 0.5)
-- **Typical update rate**: 1-3 seconds
-- **Energy counters update**: Every minute
-- **Daily energy reset**: Midnight local time
-
-## Troubleshooting Register Reads
+## Troubleshooting
 
 ### No Response
+1. Check baud rate: 9600
+2. Check slave address: 1 (default)
+3. Check RS485 wiring: A(+) and B(-) not swapped
+4. Inverter powered on and not in deep standby
+5. **After Huawei firmware update**: power-cycle the inverter
+   (AC breaker off, wait 2 min, back on) — RS485 stack can hang
 
-Check:
-1. Correct baud rate (9600)
-2. Correct slave address (default 1)
-3. Inverter is powered on
-4. RS485 wiring (A/B not swapped)
+### IllegalAddress Exception
+- Register not available in current inverter state (e.g. night/standby)
+- Register not supported by this model
+- Wrong slave address
 
-### Invalid Data
+### Register Address Formats
 
-Check:
-1. Byte order (should be big endian)
-2. Register address (some docs use 4xxxx, subtract 40001)
-3. Gain factor applied correctly
-4. Signed vs unsigned interpretation
-
-### Register Address Confusion
-
-Some Modbus documentation uses different address formats:
-
-| Format | Address | Notes |
+| Format | Example | Notes |
 |--------|---------|-------|
-| **Actual** | 32000 | What we use |
-| **4x Format** | 432001 | Add 400001 |
-| **Base-0** | 31999 | Subtract 1 |
+| **Actual (used here)** | 32089 | Direct address |
+| 4x format | 432090 | Add 400001 — do NOT use |
+| Base-0 | 32088 | Subtract 1 — do NOT use |
 
-Always use the "Actual" address format (32000, not 432001).
+Always use the actual address as listed in this document.
 
-## Additional Resources
+## Model-Specific Notes
 
-- [Huawei FusionSolar Documentation](https://akkudoktor.net/uploads/short-url/gAxRsmNJqWHuTzQKCz7GXAYmhoY.pdf)
-
-## Model-Specific Differences
-
-### SUN2000-8KTL-M1 (Model ID 428)
+### SUN2000-8KTL-M1 (Model ID: 428)
 - All registers as documented above
-- 3-phase only
-- Max DC voltage: 1100V
-- Rated power: 8000W
+- 3-phase
+- Tested with Venus OS v3.67, register mapping Issue 09
 
-### Other Models
-
-If you have a different SUN2000 model:
-1. Check the model ID at register 30070
-2. Verify register addresses in your inverter's manual
-3. Add the model to `huawei.py` models dictionary
-4. Test and report compatibility!
-
-## Contributing Register Information
-
-If you have a different SUN2000 model, please contribute:
-1. Report model ID (register 30070)
-2. Confirm working register addresses
-3. Note any differences from this documentation
-4. Submit PR or issue on GitHub
+### Adding Your Model
+1. Read Model ID: `python3 -c "from pymodbus.client.sync import ModbusSerialClient; c = ModbusSerialClient(method='rtu', port='/dev/ttyUSB1', baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=3); c.connect(); r = c.read_holding_registers(30070, 1, unit=1); print('Model ID:', r.registers[0]); c.close()"`
+2. Add to `models` dict in `huawei.py`
+3. Submit a pull request!
 
 ---
 
-**Note**: This documentation is based on SUN2000-8KTL-M1. Other models may have different register layouts.
+*Based on SUN2000MA Modbus Interface Definitions, Issue 09 (2025-12-19)*
