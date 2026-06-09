@@ -12,29 +12,50 @@ Integration plugin for connecting Huawei SUN2000 series inverters to Victron Ene
 ## 🌟 Features
 
 - ✅ **Full 3-Phase Support** - Voltage, Current, and Power per phase
+- ✅ **Line Voltages** - L1-L2, L2-L3, L1-L3
 - ✅ **Energy Monitoring** - Daily yield and lifetime total energy
 - ✅ **DC Metrics** - DC voltage, current, and power from solar panels
+- ✅ **Temperature & Efficiency** - Internal inverter temperature and efficiency
 - ✅ **Native Integration** - Appears as PV Inverter in Victron system
 - ✅ **VRM Portal Support** - All data visible in Victron Remote Management
 - ✅ **Status Monitoring** - Inverter status codes and error reporting
 - ✅ **Automatic Discovery** - Auto-detected by Victron's modbus-client
+- ✅ **Shared RS485 Bus** - Works alongside other devices (e.g. wallboxes)
 
 ## 📋 Compatibility
 
 ### Tested Hardware
 - **Inverter**: Huawei SUN2000-8KTL-M1 (Model ID: 428)
-- **GX Device**: Cerbo GX (Venus OS v3.x)
-- **Interface**: RS485 to USB adapter
+- **GX Device**: Cerbo GX (Venus OS v3.67)
+- **Interface**: FTDI FT232R USB-RS485 adapter
 
 ### Potentially Compatible Models
-This plugin should work with other SUN2000 series inverters that support Modbus RTU. You may need to add your model ID to the `models` dictionary in `huawei.py`.
+This plugin should work with other SUN2000 series inverters that support Modbus RTU.
+You may need to add your Model ID to the `models` dictionary in `huawei.py`.
+
+To find your Model ID, run on the Cerbo GX:
+```bash
+python3 -c "
+from pymodbus.client.sync import ModbusSerialClient
+c = ModbusSerialClient(method='rtu', port='/dev/ttyUSB1',
+    baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=3)
+c.connect()
+r = c.read_holding_registers(30070, 1, unit=1)
+print('Model ID:', r.registers[0] if hasattr(r,'registers') else 'no response')
+c.close()"
+```
+
+Then add your model to `huawei.py` and submit a pull request!
+
+### Register Mapping
+Based on **SUN2000MA Modbus Interface Definitions, Issue 09 (2025-12-19)**.
 
 ## 🔌 Hardware Connection
 
 ### Required Hardware
 1. Huawei SUN2000 inverter with RS485 interface
 2. Victron GX device (Cerbo GX, Venus GX, etc.)
-3. RS485 to USB adapter
+3. RS485 to USB adapter (FTDI-based recommended)
 
 ### Wiring Diagram
 
@@ -57,16 +78,20 @@ Huawei SUN2000 (COM Port)          RS485-USB Adapter
 
 ⚠️ **Important**: Check your inverter's manual for the exact COM port pinout!
 
+### Shared RS485 Bus
+Multiple devices can share the same RS485 bus (e.g. Huawei on address 1 + ABB Terra wallbox on address 2). The installation script detects all devices automatically and configures the bus correctly.
+
 ## ⚙️ Inverter Configuration
 
 ### Enable Modbus RTU on Huawei SUN2000
 
 1. **Access Inverter Interface**
-   - Connect to inverter via WLAN or FusionSolar app
-   - Login with installer/maintainer credentials
+   - Connect via SUN2000 app to the inverter's own WLAN hotspot
+     (active for ~3 minutes after power-on)
+   - Login as **Installer** (default password: `00000a`)
 
 2. **Configure RS485 Settings**
-   - Navigate to: `Settings` → `Communication` → `RS485`
+   - Navigate to: `Settings` → `Communication` → `RS485_1`
    - Set **Mode**: `Slave` (NOT Master!)
    - Set **Baud Rate**: `9600`
    - Set **Data Bits**: `8`
@@ -75,20 +100,17 @@ Huawei SUN2000 (COM Port)          RS485-USB Adapter
    - Set **Device Address**: `1` (default)
 
 3. **Save and Reboot**
-   - Apply settings
-   - Reboot inverter to activate Modbus interface
+   - Apply settings and reboot the inverter
 
 ## 🚀 Installation
 
 ### Quick Installation (Recommended)
 
-We provide an automated installation script that handles everything for you:
-
 ```bash
 # 1. Download the repository
-wget https://github.com/FoxTech-e-U/helios-victron/archive/refs/heads/main.zip
-unzip main.zip
-cd helios-victron-main
+wget https://github.com/FoxTech-e-U/helios-victron/archive/refs/heads/master.zip
+unzip master.zip
+cd helios-victron-master
 
 # 2. Run the installation script
 chmod +x install.sh
@@ -96,76 +118,57 @@ chmod +x install.sh
 
 # The script will:
 # - Help you identify the correct USB device
+# - Scan the RS485 bus for all connected devices
 # - Install the huawei.py plugin
-# - Configure Modbus settings automatically
+# - Configure Modbus settings for all detected devices
 # - Restart services and verify the installation
 ```
 
-The installation script is interactive and will guide you through each step!
-
 ### Manual Installation
-
-If you prefer manual installation or need more control, follow these steps:
 
 #### Step 1: Access Cerbo GX via SSH
 
 ```bash
-# Enable SSH access in Cerbo GX settings first and set root password
 ssh root@<cerbo-ip-address>
 ```
 
 #### Step 2: Download Files
 
 ```bash
-# Download the repository
 cd /tmp
-wget https://github.com/FoxTech-e-U/helios-victron/archive/refs/heads/main.zip
-unzip main.zip
-cd helios-victron-main
+wget https://github.com/FoxTech-e-U/helios-victron/archive/refs/heads/master.zip
+unzip master.zip
+cd helios-victron-master
 ```
 
-#### Step 3: Identify USB Device
+#### Step 3: Install the Plugin
 
 ```bash
-# List USB serial devices
-ls -l /dev/ttyUSB*
-
-# You should see something like:
-# /dev/ttyUSB0  (might be your EM540 or other device)
-# /dev/ttyUSB1  (your Huawei inverter)
-```
-
-⚠️ **Important**: Note which `ttyUSBX` is your Huawei inverter!
-
-#### Step 4: Install the Plugin
-
-```bash
-# Copy huawei.py to modbus-client directory
 cp huawei.py /opt/victronenergy/dbus-modbus-client/
 chmod 644 /opt/victronenergy/dbus-modbus-client/huawei.py
 ```
 
-#### Step 5: Configure Modbus Settings
+#### Step 4: Configure Modbus Settings
 
 ```bash
-# Replace ttyUSB1 with your actual device!
-dbus -y com.victronenergy.settings /Settings/ModbusClient/ttyUSB1/Devices SetValue "rtu:ttyUSB1:9600:1"
-dbus -y com.victronenergy.settings /Settings/ModbusClient/ttyUSB1/AutoScan SetValue 1
+# Single device (Huawei only):
+dbus -y com.victronenergy.settings /Settings/ModbusClient/ttyUSB1/Devices \
+    SetValue "rtu:ttyUSB1:9600:1"
+
+# Shared bus (Huawei on addr 1 + another device on addr 2):
+dbus -y com.victronenergy.settings /Settings/ModbusClient/ttyUSB1/Devices \
+    SetValue "rtu:ttyUSB1:9600:1,rtu:ttyUSB1:9600:2"
+
+dbus -y com.victronenergy.settings /Settings/ModbusClient/ttyUSB1/AutoScan \
+    SetValue 1
 ```
 
-#### Step 6: Restart Services
+#### Step 5: Restart Services
 
 ```bash
-# Clear Python cache
 rm -rf /opt/victronenergy/dbus-modbus-client/__pycache__/*
-
-# Restart serial-starter
 svc -t /service/serial-starter
-
-# Wait for device detection (30-60 seconds)
 sleep 30
-
-# Check if device is detected
 dbus -y | grep huawei
 ```
 
@@ -174,86 +177,122 @@ You should see:
 com.victronenergy.pvinverter.huawei_sun2000
 ```
 
-#### Step 7: Verify Installation
+#### Step 6: Verify Installation
 
 ```bash
-# Check all values
 dbus -y com.victronenergy.pvinverter.huawei_sun2000 / GetValue
-
-# Check if system sees PV inverter
-dbus -y com.victronenergy.system /Ac/PvOnOutput/L1/Power GetValue
 ```
-
-### Detailed Installation Guide
-
-For a complete step-by-step guide with troubleshooting, see [docs/INSTALLATION.md](docs/INSTALLATION.md)
 
 ## 📊 Available Data Points
 
 ### AC Output
-- **Total Power**: `/Ac/Power` (W)
-- **Frequency**: `/Ac/Frequency` (Hz)
-- **Daily Energy**: `/Ac/Energy/Forward` (kWh) - Today's production
-- **Lifetime Total**: `/Yield/Power` (kWh) - Total since installation
+| Path | Unit | Description |
+|------|------|-------------|
+| `/Ac/Power` | W | Total active power |
+| `/Ac/Frequency` | Hz | Grid frequency |
+| `/Ac/Energy/Forward` | kWh | Daily energy yield |
+| `/Yield/Power` | kWh | Lifetime total energy |
 
 ### Per Phase (L1, L2, L3)
-- **Voltage**: `/Ac/L1/Voltage`, `/Ac/L2/Voltage`, `/Ac/L3/Voltage` (V)
-- **Current**: `/Ac/L1/Current`, `/Ac/L2/Current`, `/Ac/L3/Current` (A)
-- **Power**: `/Ac/L1/Power`, `/Ac/L2/Power`, `/Ac/L3/Power` (W)
+| Path | Unit | Description |
+|------|------|-------------|
+| `/Ac/L1/Voltage` | V | Phase voltage |
+| `/Ac/L1/Current` | A | Phase current |
+| `/Ac/L1/Power` | W | Phase power (estimated as Total/3) |
+
+### Line Voltages
+| Path | Unit | Description |
+|------|------|-------------|
+| `/Ac/L1L2/Voltage` | V | Line voltage A-B |
+| `/Ac/L2L3/Voltage` | V | Line voltage B-C |
+| `/Ac/L1L3/Voltage` | V | Line voltage C-A |
 
 ### DC Input (Solar Panels)
-- **Voltage**: `/Dc/0/Voltage` (V)
-- **Current**: `/Dc/0/Current` (A)
-- **Power**: `/Dc/0/Power` (W)
+| Path | Unit | Description |
+|------|------|-------------|
+| `/Dc/0/Voltage` | V | PV string voltage |
+| `/Dc/0/Current` | A | PV string current |
+| `/Dc/0/Power` | W | PV input power |
 
-### Status
-- **Status Code**: `/StatusCode` - Inverter operational status
-- **Error Code**: `/ErrorCode` - Fault codes
-- **Position**: `/Position` - 1 = AC Output
+### Status & Diagnostics
+| Path | Unit | Description |
+|------|------|-------------|
+| `/StatusCode` | - | Device status (see table below) |
+| `/ErrorCode` | - | Fault code (0 = no fault) |
+| `/Temperature` | °C | Internal inverter temperature |
+| `/Efficiency` | % | Inverter efficiency |
+
+### StatusCode Values
+| Value | Hex | Description |
+|-------|-----|-------------|
+| 0 | 0x0000 | Standby: initialization |
+| 256 | 0x0100 | Starting |
+| 512 | 0x0200 | On-grid (running normally) |
+| 513 | 0x0201 | Grid connected: power limited |
+| 768 | 0x0300 | OFF: unexpected shutdown |
+| 769 | 0x0301 | OFF: instructed shutdown |
+| 771 | 0x0303 | OFF: communication interrupted |
+| 40960 | 0xA000 | Standby: no irradiation |
 
 ## 🔧 Troubleshooting
 
 ### Device Not Detected
 
 ```bash
-# Check if service is running
+# Check service status
 svstat /service/*ttyUSB*
 
 # Check logs
 tail -100 /var/log/dbus-modbus-client.ttyUSB1/current | tai64nlocal
-
-# Look for "Found None: Huawei SUN2000"
 ```
 
-### Wrong ttyUSB Device
+### No Response After Huawei Firmware Update
 
-If you picked the wrong USB port:
+⚠️ **Known issue**: After a Huawei SUN2000 firmware update, the RS485 stack
+can hang internally. The inverter display may still show correct RS485 settings
+but the port does not respond.
 
-```bash
-# Stop the wrong service
-svc -d /service/dbus-modbus-client.ttyUSB1
+**Fix**: Fully power-cycle the inverter:
+1. Turn off the AC breaker
+2. Wait ~2 minutes for DC capacitors to discharge
+3. Power back on
 
-# Update settings with correct device
-dbus -y com.victronenergy.settings /Settings/ModbusClient/ttyUSB2/Devices SetValue "rtu:ttyUSB2:9600:1"
-
-# Restart
-svc -t /service/serial-starter
-```
+This restores the RS485 interface without changing any settings.
 
 ### Communication Errors
 
-1. **Check wiring** - Verify A/B are not swapped
-2. **Check inverter settings** - Must be in Slave mode, 9600 baud
-3. **Check cable length** - Keep RS485 cables under 1000m (preferably shorter)
+1. **Check wiring** - Verify A/B are not swapped (try swapping if no response)
+2. **Check inverter settings** - Must be in Slave mode, 9600 baud, address 1
+3. **Check bus termination** - 120Ω terminator only at the last device on the bus
+4. **Check for competing processes** - Only one process should access the port:
+   ```bash
+   fuser /dev/ttyUSB1
+   ```
+
+### Model ID Not Recognized
+
+If your inverter is detected but shows as unknown model, find and add your Model ID:
+
+```bash
+python3 -c "
+from pymodbus.client.sync import ModbusSerialClient
+c = ModbusSerialClient(method='rtu', port='/dev/ttyUSB1',
+    baudrate=9600, bytesize=8, parity='N', stopbits=1, timeout=3)
+c.connect()
+r = c.read_holding_registers(30070, 1, unit=1)
+print('Model ID:', r.registers[0] if hasattr(r,'registers') else 'no response')
+c.close()"
+```
+
+Add the ID to the `models` dict in `huawei.py` and submit a pull request!
 
 ### After Venus OS Update
 
-After a Venus OS update, you may need to reinstall:
+After a Venus OS update `huawei.py` persists, but settings may be reset:
 
 ```bash
-# huawei.py should persist in /opt/victronenergy/dbus-modbus-client/
-# But settings might be reset:
-dbus -y com.victronenergy.settings /Settings/ModbusClient/ttyUSB1/Devices SetValue "rtu:ttyUSB1:9600:1"
+dbus -y com.victronenergy.settings /Settings/ModbusClient/ttyUSB1/Devices \
+    SetValue "rtu:ttyUSB1:9600:1"
 svc -t /service/serial-starter
 ```
 
@@ -266,7 +305,7 @@ See [docs/REGISTERS.md](docs/REGISTERS.md) for complete register mapping.
 Contributions are welcome! Please:
 
 1. Test thoroughly on your hardware
-2. Document any new inverter models
+2. Document any new inverter Model IDs
 3. Follow the existing code style
 4. Submit pull requests with clear descriptions
 
@@ -282,7 +321,7 @@ GPL-3.0 License - See [LICENSE](LICENSE) file for details.
 
 ## ⚠️ Disclaimer
 
-This software is provided "as-is" without warranty. Use at your own risk. 
+This software is provided "as-is" without warranty. Use at your own risk.
 The author is not responsible for any damage to equipment or loss of data.
 
 ## 📧 Support
@@ -290,6 +329,7 @@ The author is not responsible for any damage to equipment or loss of data.
 - **Issues**: [GitHub Issues](https://github.com/FoxTech-e-U/helios-victron/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/FoxTech-e-U/helios-victron/discussions)
 - **Buy Me a Coffee**: [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/olli_foxtech)
+
 ---
 
 **Named after Helios** ☀️ - The Greek god of the Sun, who drove his chariot across the sky each day, bringing light and energy to the world.
