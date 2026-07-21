@@ -1,26 +1,26 @@
 #!/bin/bash
 #
-# Helios-Victron Installation Script
-# ===================================
+# Helios-Victron Installation Script (Modbus TCP)
+# ==================================================
 #
-# Installs Huawei SUN2000 Modbus RTU integration on Victron Cerbo GX.
-# Compatible with Venus OS 3.70+ (read-only filesystem).
+# Installs the Huawei SUN2000 Modbus TCP daemon on Victron Cerbo GX.
+# Runs as an independent service, registers its own D-Bus service.
 #
 # Usage (run directly on Cerbo GX):
 #   wget -O /tmp/install.sh https://raw.githubusercontent.com/FoxTech-e-U/helios-victron/master/install.sh
-#   bash /tmp/install.sh [ttyUSBX]
+#   bash /tmp/install.sh <dongle-ip>
 #
-# Or if you have the repo cloned locally:
-#   ./install.sh [ttyUSBX]
+# Example:
+#   bash /tmp/install.sh 172.20.0.186
 #
 
 set -e
 
 REPO_URL="https://raw.githubusercontent.com/FoxTech-e-U/helios-victron/master"
 DATA_DIR="/data/helios-victron"
-TARGET_DIR="/opt/victronenergy/dbus-modbus-client"
+SERVICE_DIR="/service/helios-huawei-tcp"
 RC_LOCAL="/data/rc.local"
-RC_MARKER="# helios-victron"
+RC_MARKER="# helios-victron TCP daemon"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -36,212 +36,200 @@ print_header()  { echo ""; echo "========================================="; ech
 
 [ "$EUID" -ne 0 ] && { print_error "Please run as root (ssh root@<cerbo-ip>)"; exit 1; }
 
-print_header "☀️  Helios-Victron Installation"
+print_header "☀️  Helios-Victron TCP Installation"
 
 # ---------------------------------------------------------------------------
-# Step 1: Get huawei.py
+# Step 1: Get dongle IP
 # ---------------------------------------------------------------------------
-print_header "Step 1: Get Plugin"
-
-if [ -f "huawei.py" ]; then
-    print_info "Using local huawei.py"
-    HUAWEI_PY="huawei.py"
-else
-    print_info "Downloading huawei.py from GitHub..."
-    wget -q -O /tmp/huawei.py "$REPO_URL/huawei.py" || {
-        print_error "Download failed. Check internet connection."
-        exit 1
-    }
-    HUAWEI_PY="/tmp/huawei.py"
-    print_success "Downloaded huawei.py"
-fi
-
-# ---------------------------------------------------------------------------
-# Step 2: Identify USB device
-# ---------------------------------------------------------------------------
-print_header "Step 2: Identify USB Device"
-
-echo "Available USB serial devices:"
-ls -l /dev/ttyUSB* 2>/dev/null || {
-    print_error "No USB serial devices found!"
-    exit 1
-}
-echo ""
-
 if [ -z "$1" ]; then
-    print_warning "No device specified."
-    echo ""
-    for dev in /dev/ttyUSB*; do
-        devname=$(basename "$dev")
-        echo "  $devname:"
-        services=$(ls /service/*${devname}* 2>/dev/null | head -n 5)
-        [ -n "$services" ] && echo "$services" | sed 's/^/    /' || echo "    (no services running)"
-        echo ""
-    done
-    read -p "Enter device name (e.g. ttyUSB1): " DEVICE
-    [ -z "$DEVICE" ] && { print_error "No device specified."; exit 1; }
+    print_warning "No dongle IP specified."
+    read -p "Enter Huawei SDongle IP address: " DONGLE_IP
+    [ -z "$DONGLE_IP" ] && { print_error "No IP specified. Exiting."; exit 1; }
 else
-    DEVICE="$1"
+    DONGLE_IP="$1"
 fi
 
-[ ! -e "/dev/$DEVICE" ] && { print_error "Device /dev/$DEVICE does not exist!"; exit 1; }
-print_success "Using device: $DEVICE"
+print_header "Step 1: Verify Dongle Connectivity"
+
+python3 - "$DONGLE_IP" << 'PYEOF'
+import sys, time
+from pymodbus.client.sync import ModbusTcpClient
+ip = sys.argv[1]
+c = ModbusTcpClient(ip, port=502, timeout=5)
+if not c.connect():
+    print(f"FAILED to connect to {ip}:502")
+    sys.exit(1)
+time.sleep(1)
+r = c.read_holding_registers(30070, 1, unit=1)
+if hasattr(r, 'registers'):
+    print(f"OK - Model ID: {r.registers[0]}")
+else:
+    print(f"Connected but no Modbus response: {r}")
+    sys.exit(1)
+c.close()
+PYEOF
+
+if [ $? -ne 0 ]; then
+    print_error "Could not reach Huawei inverter via TCP at $DONGLE_IP:502"
+    echo ""
+    echo "Check:"
+    echo "  1. Dongle IP is correct and reachable"
+    echo "  2. Modbus TCP is enabled in the SUN2000 App (Installer login →"
+    echo "     Communication → Modbus TCP)"
+    exit 1
+fi
+print_success "Dongle reachable, inverter responding"
 
 # ---------------------------------------------------------------------------
-# Step 3: Install to /data/ and create symlink
+# Step 2: Get daemon file
 # ---------------------------------------------------------------------------
-print_header "Step 3: Install Plugin"
+print_header "Step 2: Get Daemon"
+
+if [ -f "helios-huawei-tcp.py" ]; then
+    print_info "Using local helios-huawei-tcp.py"
+    DAEMON_PY="helios-huawei-tcp.py"
+else
+    print_info "Downloading from GitHub..."
+    wget -q -O /tmp/helios-huawei-tcp.py "$REPO_URL/helios-huawei-tcp.py" || {
+        print_error "Download failed."; exit 1
+    }
+    DAEMON_PY="/tmp/helios-huawei-tcp.py"
+    print_success "Downloaded"
+fi
+
+# ---------------------------------------------------------------------------
+# Step 3: Install to /data/ with configured IP
+# ---------------------------------------------------------------------------
+print_header "Step 3: Install Daemon"
 
 mkdir -p "$DATA_DIR"
-cp "$HUAWEI_PY" "$DATA_DIR/huawei.py"
-chmod 644 "$DATA_DIR/huawei.py"
-print_success "huawei.py installed to $DATA_DIR/"
+cp "$DAEMON_PY" "$DATA_DIR/helios-huawei-tcp.py"
+sed -i "s/^DONGLE_IP        = '.*'/DONGLE_IP        = '$DONGLE_IP'/" \
+    "$DATA_DIR/helios-huawei-tcp.py"
+chmod 755 "$DATA_DIR/helios-huawei-tcp.py"
+print_success "Installed to $DATA_DIR/ (dongle IP: $DONGLE_IP)"
 
-print_info "Patching filesystem (remount rw)..."
-mount -o remount,rw /
+# ---------------------------------------------------------------------------
+# Step 4: Disable legacy RTU plugin if present (avoid duplicate D-Bus service)
+# ---------------------------------------------------------------------------
+print_header "Step 4: Check for Legacy RTU Plugin"
 
-# Symlink
-[ -f "$TARGET_DIR/huawei.py" ] && [ ! -L "$TARGET_DIR/huawei.py" ] && \
-    cp "$TARGET_DIR/huawei.py" "$TARGET_DIR/huawei.py.backup.$(date +%Y%m%d_%H%M%S)"
-ln -sf "$DATA_DIR/huawei.py" "$TARGET_DIR/huawei.py"
-print_success "Symlink: $TARGET_DIR/huawei.py → $DATA_DIR/huawei.py"
+MODBUS_DIR="/opt/victronenergy/dbus-modbus-client"
+if [ -f "$MODBUS_DIR/huawei.py" ] || grep -q "^import huawei$" "$MODBUS_DIR/dbus-modbus-client.py" 2>/dev/null; then
+    print_warning "Legacy RTU huawei.py plugin detected — removing to avoid duplicate D-Bus service"
+    mount -o remount,rw /
+    sed -i '/^import huawei$/d' "$MODBUS_DIR/dbus-modbus-client.py" 2>/dev/null || true
+    rm -f "$MODBUS_DIR/huawei.py"
+    rm -rf "$MODBUS_DIR/__pycache__/" 2>/dev/null || true
+    mount -o remount,ro /
+    print_success "Legacy RTU plugin removed"
 
-# Patch dbus-modbus-client.py to import huawei
-if ! grep -q "import huawei" "$TARGET_DIR/dbus-modbus-client.py"; then
-    sed -i 's/^import victron_em$/import victron_em\nimport huawei/' \
-        "$TARGET_DIR/dbus-modbus-client.py"
-    print_success "Added 'import huawei' to dbus-modbus-client.py"
+    # Remove old rc.local entry if present
+    sed -i "/# helios-victron$/,/^mount -o remount,ro \//d" "$RC_LOCAL" 2>/dev/null || true
+
+    print_info "Restarting dbus-modbus-client to drop RTU Huawei..."
+    for svc in /service/dbus-modbus-client.serial.*; do
+        [ -e "$svc" ] && svc -t "$svc" 2>/dev/null || true
+    done
 else
-    print_info "dbus-modbus-client.py already imports huawei"
+    print_info "No legacy RTU plugin found"
 fi
 
-# Clear pycache
-rm -rf "$TARGET_DIR/__pycache__/" 2>/dev/null || true
+# ---------------------------------------------------------------------------
+# Step 5: Install runit service
+# ---------------------------------------------------------------------------
+print_header "Step 5: Install Service"
 
-mount -o remount,ro /
-print_success "Filesystem restored to read-only"
+mkdir -p "$SERVICE_DIR/log"
+cat > "$SERVICE_DIR/run" << 'RUNEOF'
+#!/bin/sh
+exec /usr/bin/python3 -u /data/helios-victron/helios-huawei-tcp.py 2>&1
+RUNEOF
+cat > "$SERVICE_DIR/log/run" << 'LOGEOF'
+#!/bin/sh
+exec multilog t s25000 n4 /var/log/helios-huawei-tcp
+LOGEOF
+chmod 755 "$SERVICE_DIR/run"
+chmod 755 "$SERVICE_DIR/log/run"
+
+# Persist service scripts to /data/
+mkdir -p "$DATA_DIR/service/helios-huawei-tcp/log"
+cp "$SERVICE_DIR/run" "$DATA_DIR/service/helios-huawei-tcp/"
+cp "$SERVICE_DIR/log/run" "$DATA_DIR/service/helios-huawei-tcp/log/"
+chmod 755 "$DATA_DIR/service/helios-huawei-tcp/run"
+chmod 755 "$DATA_DIR/service/helios-huawei-tcp/log/run"
+
+print_success "runit service installed: $SERVICE_DIR"
 
 # ---------------------------------------------------------------------------
-# Step 4: Persist via rc.local (survives firmware updates)
+# Step 6: Persist via rc.local
 # ---------------------------------------------------------------------------
-print_header "Step 4: Persist via rc.local"
+print_header "Step 6: Persist via rc.local"
 
 if ! grep -q "$RC_MARKER" "$RC_LOCAL" 2>/dev/null; then
     cat >> "$RC_LOCAL" << EOF
 
 $RC_MARKER
-mount -o remount,rw /
-ln -sf $DATA_DIR/huawei.py $TARGET_DIR/huawei.py
-if ! grep -q "import huawei" $TARGET_DIR/dbus-modbus-client.py; then
-    sed -i 's/^import victron_em\$/import victron_em\\nimport huawei/' $TARGET_DIR/dbus-modbus-client.py
+if [ ! -f $SERVICE_DIR/run ]; then
+    mkdir -p $SERVICE_DIR/log
+    cp $DATA_DIR/service/helios-huawei-tcp/run $SERVICE_DIR/
+    cp $DATA_DIR/service/helios-huawei-tcp/log/run $SERVICE_DIR/log/
+    chmod 755 $SERVICE_DIR/run
+    chmod 755 $SERVICE_DIR/log/run
 fi
-rm -rf $TARGET_DIR/__pycache__/ 2>/dev/null || true
-mount -o remount,ro /
 EOF
     chmod +x "$RC_LOCAL"
-    print_success "rc.local updated (auto-restore after firmware updates)"
+    print_success "rc.local updated (service auto-restored after firmware updates)"
 else
-    # Update existing entry
-    print_info "Updating existing rc.local entry..."
-    # Remove old entry and rewrite
-    sed -i "/$RC_MARKER/,/^mount -o remount,ro \//d" "$RC_LOCAL" 2>/dev/null || true
-    cat >> "$RC_LOCAL" << EOF
-
-$RC_MARKER
-mount -o remount,rw /
-ln -sf $DATA_DIR/huawei.py $TARGET_DIR/huawei.py
-if ! grep -q "import huawei" $TARGET_DIR/dbus-modbus-client.py; then
-    sed -i 's/^import victron_em\$/import victron_em\\nimport huawei/' $TARGET_DIR/dbus-modbus-client.py
-fi
-rm -rf $TARGET_DIR/__pycache__/ 2>/dev/null || true
-mount -o remount,ro /
-EOF
-    print_success "rc.local updated"
+    print_info "rc.local already configured"
 fi
 
 # ---------------------------------------------------------------------------
-# Step 5: Configure Modbus
+# Step 7: Start service
 # ---------------------------------------------------------------------------
-print_header "Step 5: Configure Modbus"
+print_header "Step 7: Start Service"
 
-dbus -y com.victronenergy.settings \
-    /Settings/ModbusClient/${DEVICE}/AutoScan SetValue 1 >/dev/null 2>&1
-dbus -y com.victronenergy.settings \
-    /Settings/ModbusClient/${DEVICE}/Devices SetValue "" >/dev/null 2>&1
-print_success "Auto-scan enabled on $DEVICE"
+touch "$SERVICE_DIR/down"
+sleep 1
+rm -f "$SERVICE_DIR/down"
+sleep 3
 
-# ---------------------------------------------------------------------------
-# Step 6: Restart services
-# ---------------------------------------------------------------------------
-print_header "Step 6: Restart Services"
-
-svc -t /service/serial-starter
-print_success "Serial-starter restarted"
-
-# ---------------------------------------------------------------------------
-# Step 7: Wait for detection
-# ---------------------------------------------------------------------------
-print_header "Step 7: Waiting for Device Detection"
-
-print_info "Waiting up to 60 seconds..."
-echo -n "Progress: "
-DETECTED=0
-for i in $(seq 1 60); do
-    echo -n "."
-    sleep 1
-    if dbus -y 2>/dev/null | grep -q "huawei_sun2000"; then
-        echo ""; DETECTED=1; break
-    fi
-done
-echo ""
+STATUS=$(svstat "$SERVICE_DIR" 2>/dev/null || echo "unknown")
+echo "  $STATUS"
+echo "$STATUS" | grep -q "up" && print_success "Service running" || print_warning "Service starting..."
 
 # ---------------------------------------------------------------------------
 # Step 8: Verify
 # ---------------------------------------------------------------------------
 print_header "Step 8: Verification"
 
-if [ "$DETECTED" -eq 1 ] || dbus -y 2>/dev/null | grep -q "huawei_sun2000"; then
-    print_success "Device found: com.victronenergy.pvinverter.huawei_sun2000"
-    echo ""
-    POWER=$(dbus -y com.victronenergy.pvinverter.huawei_sun2000 /Ac/Power GetValue 2>/dev/null || echo "N/A")
-    echo "  AC Power:    $POWER W"
-    YIELD=$(dbus -y com.victronenergy.pvinverter.huawei_sun2000 /Yield/Power GetValue 2>/dev/null || echo "N/A")
-    echo "  Lifetime:    $YIELD kWh"
-    STATUS=$(dbus -y com.victronenergy.pvinverter.huawei_sun2000 /StatusCode GetValue 2>/dev/null || echo "N/A")
-    printf "  Status:      %s" "$STATUS"
-    case "$STATUS" in
-        512)   echo " (On-grid running)" ;;
-        40960) echo " (Standby: no irradiation)" ;;
-        *)     echo "" ;;
-    esac
-    TEMP=$(dbus -y com.victronenergy.pvinverter.huawei_sun2000 /Temperature GetValue 2>/dev/null || echo "N/A")
-    echo "  Temperature: $TEMP °C"
+print_info "Waiting for first poll cycle (up to 40s)..."
+sleep 15
+DETECTED=$(dbus -y 2>/dev/null | grep -c "huawei_sun2000" || echo "0")
+if [ "$DETECTED" -gt 0 ]; then
+    print_success "D-Bus service active: com.victronenergy.pvinverter.huawei_sun2000"
+    CONNECTED=$(dbus -y com.victronenergy.pvinverter.huawei_sun2000 /Connected GetValue 2>/dev/null || echo "N/A")
+    echo "  Connected: $CONNECTED"
 else
-    print_error "Huawei SUN2000 not detected after 60 seconds!"
-    echo ""
-    echo "Common fixes:"
-    echo "  1. SDongle plugged in? → Unplug it, then power-cycle the inverter."
-    echo "  2. After Huawei firmware update? → Power-cycle (AC off, 2min, back on)."
-    echo "  3. Wrong wiring? → Pin5=GND, Pin7=A(+), Pin9=B(-)"
-    echo ""
-    echo "Logs: tail -50 /var/log/dbus-modbus-client.${DEVICE}/current | tai64nlocal"
-    exit 1
+    print_warning "D-Bus service not detected yet — check logs:"
+    echo "  tail -f /var/log/helios-huawei-tcp/current | tai64nlocal"
 fi
 
 # ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
 print_header "✅ Installation Complete!"
-echo "  Plugin:     $DATA_DIR/huawei.py"
-echo "  Symlink:    $TARGET_DIR/huawei.py"
-echo "  Import:     patched into dbus-modbus-client.py"
-echo "  Persistent: $RC_LOCAL (auto-restore after firmware updates)"
+echo "  Daemon:     $DATA_DIR/helios-huawei-tcp.py"
+echo "  Dongle IP:  $DONGLE_IP"
+echo "  Service:    $SERVICE_DIR"
+echo "  Persistent: $RC_LOCAL"
 echo ""
-echo "To update to latest version:"
-echo "  wget -O /tmp/install.sh $REPO_URL/install.sh && bash /tmp/install.sh $DEVICE"
+echo "Monitor:"
+echo "  tail -f /var/log/helios-huawei-tcp/current | tai64nlocal"
+echo "  dbus -y com.victronenergy.pvinverter.huawei_sun2000 / GetValue"
 echo ""
-echo "⚠ SDongle and RS485 cannot be used simultaneously."
-echo "⚠ After Huawei firmware update: power-cycle the inverter."
+echo "⚠ RS485 (RTU) and the SDongle cannot be used simultaneously."
+echo "  If a wallbox or other device needs RS485, connect it directly to"
+echo "  the Cerbo — do not share the bus with the Huawei COM port."
 echo ""
 print_success "Done! ☀️"
-
