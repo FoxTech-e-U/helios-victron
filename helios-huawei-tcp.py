@@ -126,7 +126,7 @@ class HuaweiTcpDaemon:
         svc = VeDbusService('com.victronenergy.pvinverter.huawei_sun2000', register=False)
 
         svc.add_path('/Mgmt/ProcessName', __file__)
-        svc.add_path('/Mgmt/ProcessVersion', '2.0-tcp')
+        svc.add_path('/Mgmt/ProcessVersion', '2.0.1-tcp')
         svc.add_path('/Mgmt/Connection', f'Modbus TCP {DONGLE_IP}:{DONGLE_PORT}')
         svc.add_path('/DeviceInstance', DEVICE_INSTANCE)
         svc.add_path('/ProductId', 0xB042)
@@ -135,7 +135,7 @@ class HuaweiTcpDaemon:
         svc.add_path('/Connected', 0)
         svc.add_path('/AllowedRoles', ['pvinverter'])
         svc.add_path('/Role', 'pvinverter')
-        svc.add_path('/Position', 0)
+        svc.add_path('/Position', 1)
         svc.add_path('/NrOfPhases', 3)
         svc.add_path('/Serial', 'tcp-dongle')
 

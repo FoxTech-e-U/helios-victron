@@ -72,3 +72,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MAJOR**: Breaking changes
 - **MINOR**: New features, backwards compatible
 - **PATCH**: Bug fixes, backwards compatible
+
+## [2.0.1] - 2026-09-07
+### Fixed
+- **Position** falsch auf `0` (AC Input) gesetzt, obwohl der Huawei laut
+  aktueller Anlagentopologie auf der AC-Output-Seite (im Haus, hinter den
+  3x Multiplus) hängt. Führte ohne externen Netzzähler zu einer falschen
+  Grid-Berechnung in Venus OS/VRM (PV-Leistung wurde fälschlich der
+  Netzseite zugerechnet statt der Hausseite).
